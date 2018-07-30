@@ -1,0 +1,6 @@
+[package]
+name = "namegen"
+version = "0.1.0"
+authors = ["Jeff Olhoeft <jolhoeft@gmail.com>"]
+
+[dependencies]
