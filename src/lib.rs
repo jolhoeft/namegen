@@ -119,7 +119,7 @@ const FIVE_AOU: &str = "aeiouAOU";
 const VOWEL_SETS: &[&str] = &[FIVE, THREE, FIVE_AEI, FIVE_U, THREE_AI, ALT_THREE, FIVE_AOU];
 
 /// This probably breaks for some languages/alphabets, but for generating random
-/// languages, ought to be fine. By Deinition, reallly.
+/// languages, ought to be fine. By Definition, really.
 fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
@@ -140,6 +140,8 @@ struct Phonemes {
 impl Phonemes {
     fn from_rand<R: Rng>(rng: &mut R) -> Phonemes {
         // none of the unwraps in this method should ever fail
+        // TODO: use rand::distributions::WeightedChoice so sounds are not uniformly distribuded
+        //       probably a weighting of 1, 3, 5...
         let mut consonants: Vec<char> = rng.choose(CONSONANT_SETS).unwrap().chars().collect();
         rng.shuffle(&mut consonants);
         let mut vowels: Vec<char> = rng.choose(VOWEL_SETS).unwrap().chars().collect();
@@ -197,7 +199,12 @@ impl BaseLanguage {
     }
 
     fn make_word<R: Rng>(&self, rng: &mut R, morphemes: Option<&Vec<String>>) -> String {
-        let ipa_word = (0u8..rng.gen_range(self.min_syllable, self.max_syllable+1)).
+        // Use a decaying distribution for syllable count. Short words
+        // should be more common than long ones.
+        let min = self.min_syllable as f32;
+        let delta = (self.max_syllable + 1 - self.min_syllable) as f32; // we are using an inclusive range
+        let count = (rng.gen::<f32>().powf(2.0)*delta + min).floor() as u8;
+        let ipa_word = (0u8..count).
             map(|_| if let Some(ref morph) = morphemes {
                 if rng.gen::<bool>() {
                     rng.choose(morph).unwrap().clone()
@@ -291,6 +298,9 @@ impl Language {
     }
 
     fn make_person_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+        // TODO: customize make_name_rng for person names
+        //       1) Instead of ddefinite, create a list of titles to lead with
+        //       2) surname_last: bool - to choose the short name
         self.make_name_rng(rng, Some(&self.person))
     }
 
@@ -339,13 +349,13 @@ mod tests {
         // the same seed.
         assert_eq!(lang.genitive, "ski");
         assert_eq!(lang.definite, "pil");
-        assert_eq!(word, "slustaschpim");
-        assert_eq!(place.0, "Nislunak Suschma");        
-        assert_eq!(place.1, "Nislunak");        
-        assert_eq!(region.0, "Schkakschtiskisi Kunslimit");        
-        assert_eq!(region.1, "Schkakschtiskisi");        
-        assert_eq!(person.0, "Saschkunakis Palsmaschtunta");        
-        assert_eq!(person.1, "Saschkunakis");        
+        assert_eq!(word, "slusta");
+        assert_eq!(place.0, "Nuschnim");
+        assert_eq!(place.1, "Nuschnim");
+        assert_eq!(region.0, "Slunakschmapu Lischlalukun");
+        assert_eq!(region.1, "Slunakschmapu");
+        assert_eq!(person.0, "Lismi");
+        assert_eq!(person.1, "Lismi");
     }
 
     #[test]
