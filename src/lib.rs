@@ -1,9 +1,11 @@
 extern crate rand;
 
-use rand::Rng;
+use rand::{Rng, SeedableRng, thread_rng};
+use rand::prng::XorShiftRng;
 use std::collections::HashMap;
 
 /// Mapping of international phonetics to characters
+#[derive(Debug, Clone)]
 struct Orthography {
     // String or Vec<Char>?
     orthography: HashMap<char, String>,
@@ -11,7 +13,7 @@ struct Orthography {
 
 impl Orthography {
     fn new() -> Orthography {
-        let mut orth = Orthography{orthography: HashMap::new()};
+        let orth = Orthography{orthography: HashMap::new()};
         orth.with_mapping(DEFAULT_MAP)
     }
 
@@ -25,6 +27,10 @@ impl Orthography {
     // TODO: figure out how to avoid the cloning
     fn get_mapping(&self, ch: &char) -> String {
         self.orthography.get(ch).map(|s| s.to_string()).unwrap_or(ch.to_string())
+    }
+
+    fn transform(&self, word: &str) -> String {
+        word.chars().map(|ref ch| self.get_mapping(ch)).collect::<Vec<_>>().join("")
     }
 }
 
@@ -59,10 +65,10 @@ const VOWEL_MAPPINGS: &[&[(char, &str)]] = &[NULL_MAP, UMLAUTS_MAP, WELSH_MAP, D
 
 const SYLLABLESTRUCT: &[&str] = &["CVC",
     "CVvC",
-    "CVVc", "CVc", "CV", "VC", "CVF", "cVC", "CVf",
-    "ClVC", "ClVF", "sCVC", "sCVF", "sCVc",
-    "cVF", "cVc", "cVf", "clVC", "VC",
-    "CVlc", "cVlC", "cVLc"];
+    "CVVc", "CVc", "CV", "VC", "CVE", "cVC", "CVe",
+    "CgVC", "CgVE", "sCVC", "sCVE", "sCVc",
+    "cVE", "cVc", "cVe", "cgVC", "VC",
+    "CVgc", "cVgC", "cVGc"];
 
 // Consonant characters sets (international phonetic alphabet)
 const MINIMAL: &str = "ptkmnls";
@@ -112,6 +118,17 @@ const FIVE_AOU: &str = "aeiouAOU";
 
 const VOWEL_SETS: &[&str] = &[FIVE, THREE, FIVE_AEI, FIVE_U, THREE_AI, ALT_THREE, FIVE_AOU];
 
+/// This probably breaks for some languages/alphabets, but for generating random
+/// languages, ought to be fine. By Deinition, reallly.
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().to_string() + c.as_str(),
+    }
+}
+
+#[derive(Debug, Clone)]
 struct Phonemes {
     consonants: Vec<char>,
     vowels: Vec<char>,
@@ -137,18 +154,78 @@ impl Phonemes {
     }
 }
 
-struct Language {
+#[derive(Debug, Clone)]
+struct BaseLanguage {
     phonemes: Phonemes,
     orthography: Orthography,
     syllable: Vec<char>,
     min_syllable: u8,
     max_syllable: u8,
-    genitive: Option<String>, // "of"
-    definite: Option<String>, // "the"
+}
+
+impl BaseLanguage {
+    fn make_syllable<R: Rng>(&self, rng: &mut R) -> String {
+        self.syllable.iter().fold(String::new(), |mut acc, ch_type| {
+            match ch_type {
+                'C' => acc.push(*rng.choose(&self.phonemes.consonants).unwrap()),
+                'c' => if rng.gen::<bool>() {
+                    acc.push(*rng.choose(&self.phonemes.consonants).unwrap());
+                },
+                'V' => acc.push(*rng.choose(&self.phonemes.vowels).unwrap()),
+                'v' => if rng.gen::<bool>() {
+                    acc.push(*rng.choose(&self.phonemes.vowels).unwrap());
+                },
+                'E' => acc.push(*rng.choose(&self.phonemes.endings).unwrap()),
+                'e' => if rng.gen::<bool>() {
+                    acc.push(*rng.choose(&self.phonemes.endings).unwrap());
+                },
+                'G' => acc.push(*rng.choose(&self.phonemes.glides).unwrap()),
+                'g' => if rng.gen::<bool>() {
+                    acc.push(*rng.choose(&self.phonemes.glides).unwrap());
+                },
+                'S' => acc.push(*rng.choose(&self.phonemes.sibilants).unwrap()),
+                's' => if rng.gen::<bool>() {
+                    acc.push(*rng.choose(&self.phonemes.sibilants).unwrap());
+                },
+                _ => {
+                    // this should never happen
+                    panic!("Internal bug in namegen");
+                }
+            };
+            acc
+        })
+    }
+
+    fn make_word<R: Rng>(&self, rng: &mut R, morphemes: Option<&Vec<String>>) -> String {
+        let ipa_word = (0u8..rng.gen_range(self.min_syllable, self.max_syllable+1)).
+            map(|_| if let Some(ref morph) = morphemes {
+                if rng.gen::<bool>() {
+                    rng.choose(morph).unwrap().clone()
+                } else {
+                    self.make_syllable(rng)
+                }
+            } else {
+                self.make_syllable(rng)
+            }).
+            collect::<Vec<_>>().join("");
+        self.orthography.transform(&ipa_word)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Language {
+    base: BaseLanguage,
+    genitive: String, // "of"
+    definite: String, // "the"
+    // morphemes
+    place: Vec<String>,
+    region: Vec<String>,
+    person: Vec<String>,
 }
 
 impl Language {
-    fn from_rand<R: Rng>(rng: &mut R) -> Language {
+    /// Creates a random language from the provide random number generator.
+    pub fn from_rng<R: Rng>(rng: &mut R) -> Language {
         // none of the unwraps in this method should ever fail
         let phonemes = Phonemes::from_rand(rng);
         let c_map = rng.choose(CONSONANT_MAPPINGS).unwrap();
@@ -161,16 +238,131 @@ impl Language {
             rng.gen_range(1u8, 3u8)
         };
         let max_syllable = rng.gen_range(min_syllable + 1, 7u8);
-        Language{phonemes, orthography, syllable, min_syllable, max_syllable,
-                 genitive: None, definite: None}
+        let base = BaseLanguage{phonemes, orthography, syllable, min_syllable, max_syllable};
         // TODO: generate genitive and definite
+        let genitive = base.orthography.transform(&base.make_syllable(rng));
+        let definite = base.orthography.transform(&base.make_syllable(rng));
+        let place = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
+        let region = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
+        let person = (0u8..rng.gen_range(7, 14)).map(|_| base.make_syllable(rng)).collect();
+        Language{base, genitive, definite, place, region, person}
+    }
+
+    /// Creates a random language using the provided string as a seed for a
+    /// pseudo random number genrator. Only the first 16 bytes of the string are
+    /// use.
+    pub fn from_str(s: &str) -> Language {
+        let mut seed = [1u8; 16]; // zeros would break on empty strings
+        for (b, s) in s.bytes().zip(seed.iter_mut()) {
+            *s = b;
+        }
+        let mut rng = XorShiftRng::from_seed(seed);
+        Language::from_rng(&mut rng)
+    }
+
+    fn make_name_rng<R: Rng>(&self, rng: &mut R, morphemes: Option<&Vec<String>>) -> (String, String) {
+        let (long, short) = if rng.gen::<bool>() {
+            // one word
+            let w = capitalize(&self.base.make_word(rng, morphemes));
+            (w.clone(), w)
+        } else {
+            let w1 = capitalize(&self.base.make_word(rng, morphemes));
+            let w2 = capitalize(&self.base.make_word(rng, morphemes));
+            let l = if rng.gen::<bool>() {
+                w1.clone() + " " + &w2
+            } else {
+                w1.clone() + " " + &self.genitive + " " + &w2
+            };
+            (l, w1)
+        };
+        if rng.gen::<f32>() < 0.1 {
+            (capitalize(&self.definite) + " " + &long, short)
+        } else {
+            (long, short)
+        }
+    }
+
+    fn make_place_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+        self.make_name_rng(rng, Some(&self.place))
+    }
+
+    fn make_region_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+        self.make_name_rng(rng, Some(&self.region))
+    }
+
+    fn make_person_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+        self.make_name_rng(rng, Some(&self.person))
+    }
+
+    pub fn make_syllable(&self) -> String {
+        self.base.make_syllable(&mut thread_rng())
+    }
+
+    pub fn make_word(&self) -> String {
+        self.base.make_word(&mut thread_rng(), None)
+    }
+
+    pub fn make_place(&self) -> (String, String) {
+        self.make_place_rng(&mut thread_rng())
+    }
+
+    pub fn make_region(&self) -> (String, String) {
+        self.make_region_rng(&mut thread_rng())
+    }
+
+    pub fn make_person(&self) -> (String, String) {
+        self.make_person_rng(&mut thread_rng())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::SeedableRng;
+    use rand::prng::XorShiftRng;
+    use super::Language;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn pseudo_rng() {
+        let seed = [1u8; 16];
+        let mut rng = XorShiftRng::from_seed(seed);
+        let lang = Language::from_rng(&mut rng);
+        println!("lang: {:?}", lang);
+
+        let word = lang.base.make_word(&mut rng, None);
+        println!("Word: {}", word);
+
+        let place = lang.make_place_rng(&mut rng);
+        let region = lang.make_region_rng(&mut rng);
+        let person = lang.make_person_rng(&mut rng);
+        println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
+        // These should aways be the same, so we can get the same language for
+        // the same seed.
+        assert_eq!(lang.genitive, "ski");
+        assert_eq!(lang.definite, "pil");
+        assert_eq!(word, "slustaschpim");
+        assert_eq!(place.0, "Nislunak Suschma");        
+        assert_eq!(place.1, "Nislunak");        
+        assert_eq!(region.0, "Schkakschtiskisi Kunslimit");        
+        assert_eq!(region.1, "Schkakschtiskisi");        
+        assert_eq!(person.0, "Saschkunakis Palsmaschtunta");        
+        assert_eq!(person.1, "Saschkunakis");        
+    }
+
+    #[test]
+    fn name_seeded() {
+        let lang = Language::from_str("NotEnglish");
+        println!("lang: {:?}", lang);
+
+        let word = lang.make_word();
+        println!("Word: {}", word);
+
+        let place = lang.make_place();
+        let region = lang.make_region();
+        let person = lang.make_person();
+        println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
+        // These should aways be the same, so we can get the same language for
+        // the same seed.
+        assert_eq!(lang.genitive, "dart");
+        assert_eq!(lang.definite, "cherzh");
     }
 }
