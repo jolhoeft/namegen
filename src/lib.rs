@@ -128,6 +128,12 @@ fn capitalize(s: &str) -> String {
     }
 }
 
+fn weighted_char<R: Rng>(rng: &mut R, chars: &Vec<char>) -> char {
+    // random select a character, weighted towards the beginning of the list
+    // it should be impossible for the unwrap to panic
+    *(chars.get((rng.gen::<f32>().powf(2.0) * (chars.len() as f32)).floor() as usize).unwrap())
+}
+
 #[derive(Debug, Clone)]
 struct Phonemes {
     consonants: Vec<char>,
@@ -169,25 +175,25 @@ impl BaseLanguage {
     fn make_syllable<R: Rng>(&self, rng: &mut R) -> String {
         self.syllable.iter().fold(String::new(), |mut acc, ch_type| {
             match ch_type {
-                'C' => acc.push(*rng.choose(&self.phonemes.consonants).unwrap()),
+                'C' => acc.push(weighted_char(rng, &self.phonemes.consonants)),
                 'c' => if rng.gen::<bool>() {
-                    acc.push(*rng.choose(&self.phonemes.consonants).unwrap());
+                    acc.push(weighted_char(rng, &self.phonemes.consonants));
                 },
-                'V' => acc.push(*rng.choose(&self.phonemes.vowels).unwrap()),
+                'V' => acc.push(weighted_char(rng, &self.phonemes.vowels)),
                 'v' => if rng.gen::<bool>() {
-                    acc.push(*rng.choose(&self.phonemes.vowels).unwrap());
+                    acc.push(weighted_char(rng, &self.phonemes.vowels));
                 },
-                'E' => acc.push(*rng.choose(&self.phonemes.endings).unwrap()),
+                'E' => acc.push(weighted_char(rng, &self.phonemes.endings)),
                 'e' => if rng.gen::<bool>() {
-                    acc.push(*rng.choose(&self.phonemes.endings).unwrap());
+                    acc.push(weighted_char(rng, &self.phonemes.endings));
                 },
-                'G' => acc.push(*rng.choose(&self.phonemes.glides).unwrap()),
+                'G' => acc.push(weighted_char(rng, &self.phonemes.glides)),
                 'g' => if rng.gen::<bool>() {
-                    acc.push(*rng.choose(&self.phonemes.glides).unwrap());
+                    acc.push(weighted_char(rng, &self.phonemes.glides));
                 },
-                'S' => acc.push(*rng.choose(&self.phonemes.sibilants).unwrap()),
+                'S' => acc.push(weighted_char(rng, &self.phonemes.sibilants)),
                 's' => if rng.gen::<bool>() {
-                    acc.push(*rng.choose(&self.phonemes.sibilants).unwrap());
+                    acc.push(weighted_char(rng, &self.phonemes.sibilants));
                 },
                 _ => {
                     // this should never happen
@@ -207,7 +213,9 @@ impl BaseLanguage {
         let ipa_word = (0u8..count).
             map(|_| if let Some(ref morph) = morphemes {
                 if rng.gen::<bool>() {
-                    rng.choose(morph).unwrap().clone()
+                    // weighted towards the beginning of the list
+                    let index = (rng.gen::<f32>().powf(2.0) * (morph.len() as f32)).floor() as usize;
+                    morph.get(index).unwrap().clone()
                 } else {
                     self.make_syllable(rng)
                 }
@@ -228,6 +236,8 @@ pub struct Language {
     place: Vec<String>,
     region: Vec<String>,
     person: Vec<String>,
+    titles: Vec<String>,
+    surname_last: bool,
 }
 
 impl Language {
@@ -252,7 +262,16 @@ impl Language {
         let place = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
         let region = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
         let person = (0u8..rng.gen_range(7, 14)).map(|_| base.make_syllable(rng)).collect();
-        Language{base, genitive, definite, place, region, person}
+        let titles = (0u8..rng.gen_range(4, 8)).map(|_| {
+            let title = base.make_syllable(rng);
+            if rng.gen::<f32>() < 0.9 {
+                capitalize(&title)
+            } else {
+                title
+            }
+        }).collect();
+        let surname_last = rng.gen::<bool>();
+        Language{base, genitive, definite, place, region, person, titles, surname_last}
     }
 
     /// Creates a random language using the provided string as a seed for a
@@ -301,7 +320,32 @@ impl Language {
         // TODO: customize make_name_rng for person names
         //       1) Instead of ddefinite, create a list of titles to lead with
         //       2) surname_last: bool - to choose the short name
-        self.make_name_rng(rng, Some(&self.person))
+        let (long, short) = if rng.gen::<bool>() {
+            // one word
+            let w = capitalize(&self.base.make_word(rng, Some(&self.person)));
+            (w.clone(), w)
+        } else {
+            let w1 = capitalize(&self.base.make_word(rng, Some(&self.person)));
+            let w2 = capitalize(&self.base.make_word(rng, Some(&self.person)));
+            let l = if rng.gen::<bool>() {
+                w1.clone() + " " + &w2
+            } else {
+                w1.clone() + " " + &self.genitive + " " + &w2
+            };
+            if self.surname_last {
+                (l, w2)
+            } else {
+                (l, w1)
+            }
+        };
+        if rng.gen::<f32>() < 0.1 {
+            // add a title
+            let index = (rng.gen::<f32>().powf(2.0) * (self.titles.len() as f32)).floor() as usize;
+            let title = self.titles.get(index).unwrap();
+            (title.clone() + " " + &long, title.clone() + " " + &short)
+        } else {
+            (long, short)
+        }
     }
 
     pub fn make_syllable(&self) -> String {
@@ -347,15 +391,15 @@ mod tests {
         println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
         // These should aways be the same, so we can get the same language for
         // the same seed.
-        assert_eq!(lang.genitive, "ski");
-        assert_eq!(lang.definite, "pil");
-        assert_eq!(word, "slusta");
-        assert_eq!(place.0, "Nuschnim");
-        assert_eq!(place.1, "Nuschnim");
-        assert_eq!(region.0, "Slunakschmapu Lischlalukun");
-        assert_eq!(region.1, "Slunakschmapu");
-        assert_eq!(person.0, "Lismi");
-        assert_eq!(person.1, "Lismi");
+        assert_eq!(lang.genitive, "snuk");
+        assert_eq!(lang.definite, "ta");
+        assert_eq!(word, "muschman");
+        assert_eq!(place.0, "Schtupssanschmu");
+        assert_eq!(place.1, "Schtupssanschmu");
+        assert_eq!(region.0, "Ta Lumspuschma");
+        assert_eq!(region.1, "Lumspuschma");
+        assert_eq!(person.0, "Sukmu Schmumtup");
+        assert_eq!(person.1, "Sukmu");
     }
 
     #[test]
@@ -372,7 +416,7 @@ mod tests {
         println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
         // These should aways be the same, so we can get the same language for
         // the same seed.
-        assert_eq!(lang.genitive, "dart");
-        assert_eq!(lang.definite, "cherzh");
+        assert_eq!(lang.genitive, "doz");
+        assert_eq!(lang.definite, "zulp");
     }
 }
