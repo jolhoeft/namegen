@@ -263,7 +263,7 @@ impl Language {
         let region = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
         let person = (0u8..rng.gen_range(7, 14)).map(|_| base.make_syllable(rng)).collect();
         let titles = (0u8..rng.gen_range(4, 8)).map(|_| {
-            let title = base.make_syllable(rng);
+            let title = base.orthography.transform(&base.make_syllable(rng));
             if rng.gen::<f32>() < 0.9 {
                 capitalize(&title)
             } else {
