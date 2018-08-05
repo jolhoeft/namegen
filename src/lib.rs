@@ -146,8 +146,6 @@ struct Phonemes {
 impl Phonemes {
     fn from_rand<R: Rng>(rng: &mut R) -> Phonemes {
         // none of the unwraps in this method should ever fail
-        // TODO: use rand::distributions::WeightedChoice so sounds are not uniformly distribuded
-        //       probably a weighting of 1, 3, 5...
         let mut consonants: Vec<char> = rng.choose(CONSONANT_SETS).unwrap().chars().collect();
         rng.shuffle(&mut consonants);
         let mut vowels: Vec<char> = rng.choose(VOWEL_SETS).unwrap().chars().collect();
@@ -212,7 +210,7 @@ impl BaseLanguage {
         let count = (rng.gen::<f32>().powf(2.0)*delta + min).floor() as u8;
         let ipa_word = (0u8..count).
             map(|_| if let Some(ref morph) = morphemes {
-                if rng.gen::<bool>() {
+                if rng.gen::<f32>() < 0.25 {
                     // weighted towards the beginning of the list
                     let index = (rng.gen::<f32>().powf(2.0) * (morph.len() as f32)).floor() as usize;
                     morph.get(index).unwrap().clone()
@@ -394,12 +392,12 @@ mod tests {
         assert_eq!(lang.genitive, "snuk");
         assert_eq!(lang.definite, "ta");
         assert_eq!(word, "muschman");
-        assert_eq!(place.0, "Schtupssanschmu");
-        assert_eq!(place.1, "Schtupssanschmu");
-        assert_eq!(region.0, "Ta Lumspuschma");
-        assert_eq!(region.1, "Lumspuschma");
-        assert_eq!(person.0, "Sukmu Schmumtup");
-        assert_eq!(person.1, "Sukmu");
+        assert_eq!(place.0, "Schtupmassan");
+        assert_eq!(place.1, "Schtupmassan");
+        assert_eq!(region.0, "Schmipmammum");
+        assert_eq!(region.1, "Schmipmammum");
+        assert_eq!(person.0, "Lamuk");
+        assert_eq!(person.1, "Lamuk");
     }
 
     #[test]
