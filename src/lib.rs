@@ -284,6 +284,14 @@ impl Language {
         Language::from_rng(&mut rng)
     }
 
+    pub fn make_syllable_rng<R: Rng>(&self, rng: &mut R) -> String {
+        self.base.make_syllable(rng)
+    }
+
+    pub fn make_word_rng<R: Rng>(&self, rng: &mut R) -> String {
+        self.base.make_word(rng, None)
+    }
+
     fn make_name_rng<R: Rng>(&self, rng: &mut R, morphemes: Option<&Vec<String>>) -> (String, String) {
         let (long, short) = if rng.gen::<bool>() {
             // one word
@@ -306,15 +314,15 @@ impl Language {
         }
     }
 
-    fn make_place_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+    pub fn make_place_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
         self.make_name_rng(rng, Some(&self.place))
     }
 
-    fn make_region_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+    pub fn make_region_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
         self.make_name_rng(rng, Some(&self.region))
     }
 
-    fn make_person_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
+    pub fn make_person_rng<R: Rng>(&self, rng: &mut R) -> (String, String) {
         // TODO: customize make_name_rng for person names
         //       1) Instead of ddefinite, create a list of titles to lead with
         //       2) surname_last: bool - to choose the short name
