@@ -292,7 +292,7 @@ impl Language {
         &self.definite
     }
 
-    pub fn title(&self) -> &Vec<String> {
+    pub fn titles(&self) -> &Vec<String> {
         &self.titles
     }
 
