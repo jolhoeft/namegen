@@ -284,8 +284,16 @@ impl Language {
         Language::from_rng(&mut rng)
     }
 
-    pub fn make_syllable_rng<R: Rng>(&self, rng: &mut R) -> String {
-        self.base.make_syllable(rng)
+    pub fn genitive(&self) -> &str {
+        &self.genitive
+    }
+
+    pub fn definite(&self) -> &str {
+        &self.definite
+    }
+
+    pub fn title(&self) -> &Vec<String> {
+        &self.titles
     }
 
     pub fn make_word_rng<R: Rng>(&self, rng: &mut R) -> String {
@@ -352,10 +360,6 @@ impl Language {
         } else {
             (long, short)
         }
-    }
-
-    pub fn make_syllable(&self) -> String {
-        self.base.make_syllable(&mut thread_rng())
     }
 
     pub fn make_word(&self) -> String {
