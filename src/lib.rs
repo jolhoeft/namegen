@@ -1,7 +1,8 @@
 extern crate rand;
-
+extern crate rand_xorshift;
 use rand::{Rng, SeedableRng, thread_rng};
-use rand::prng::XorShiftRng;
+use rand::seq::SliceRandom;
+use rand_xorshift::XorShiftRng;
 use std::collections::HashMap;
 
 /// Mapping of international phonetics to characters
@@ -146,16 +147,16 @@ struct Phonemes {
 impl Phonemes {
     fn from_rand<R: Rng>(rng: &mut R) -> Phonemes {
         // none of the unwraps in this method should ever fail
-        let mut consonants: Vec<char> = rng.choose(CONSONANT_SETS).unwrap().chars().collect();
-        rng.shuffle(&mut consonants);
-        let mut vowels: Vec<char> = rng.choose(VOWEL_SETS).unwrap().chars().collect();
-        rng.shuffle(&mut vowels);
-        let mut sibilants: Vec<char> = rng.choose(SIBILANT_SETS).unwrap().chars().collect();
-        rng.shuffle(&mut sibilants);
-        let mut glides: Vec<char> = rng.choose(GLIDE_SETS).unwrap().chars().collect();
-        rng.shuffle(&mut glides);
-        let mut endings: Vec<char> = rng.choose(ENDING_SETS).unwrap().chars().collect();
-        rng.shuffle(&mut endings);
+        let mut consonants: Vec<char> = CONSONANT_SETS.choose(rng).unwrap().chars().collect();
+        consonants.shuffle(rng);
+        let mut vowels: Vec<char> = VOWEL_SETS.choose(rng).unwrap().chars().collect();
+        vowels.shuffle(rng);
+        let mut sibilants: Vec<char> = SIBILANT_SETS.choose(rng).unwrap().chars().collect();
+        sibilants.shuffle(rng);
+        let mut glides: Vec<char> = GLIDE_SETS.choose(rng).unwrap().chars().collect();
+        glides.shuffle(rng);
+        let mut endings: Vec<char> = ENDING_SETS.choose(rng).unwrap().chars().collect();
+        endings.shuffle(rng);
         Phonemes{consonants, vowels, sibilants, glides, endings}
     }
 }
@@ -243,10 +244,10 @@ impl Language {
     pub fn from_rng<R: Rng>(rng: &mut R) -> Language {
         // none of the unwraps in this method should ever fail
         let phonemes = Phonemes::from_rand(rng);
-        let c_map = rng.choose(CONSONANT_MAPPINGS).unwrap();
-        let v_map = rng.choose(VOWEL_MAPPINGS).unwrap();
+        let c_map = CONSONANT_MAPPINGS.choose(rng).unwrap();
+        let v_map = VOWEL_MAPPINGS.choose(rng).unwrap();
         let orthography = Orthography::new().with_mapping(c_map).with_mapping(v_map);
-        let syllable: Vec<char> = rng.choose(SYLLABLESTRUCT).unwrap().chars().collect();
+        let syllable: Vec<char> = SYLLABLESTRUCT.choose(rng).unwrap().chars().collect();
         let min_syllable = if syllable.len() < 3 {
             rng.gen_range(1u8, 3u8) + 1
         } else {
@@ -269,7 +270,7 @@ impl Language {
             }
         }
         let mut titles = Vec::new();
-        let title_count: usize = rng.gen_range::<u8>(4, 8) as usize;
+        let title_count: usize = rng.gen_range(4u8, 8u8) as usize;
         while titles.len() < title_count {
             let title = make_title(rng, &base);
             if !titles.contains(&title) {
@@ -390,7 +391,7 @@ impl Language {
 #[cfg(test)]
 mod tests {
     use rand::SeedableRng;
-    use rand::prng::XorShiftRng;
+    use rand_xorshift::XorShiftRng;
     use super::Language;
 
     #[test]
