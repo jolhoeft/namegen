@@ -410,15 +410,15 @@ mod tests {
         println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
         // These should aways be the same, so we can get the same language for
         // the same seed.
-        assert_eq!(lang.genitive, "snuk");
-        assert_eq!(lang.definite, "ta");
-        assert_eq!(word, "muschman");
-        assert_eq!(place.0, "Schtupmassan");
-        assert_eq!(place.1, "Schtupmassan");
-        assert_eq!(region.0, "Schmipmammum");
-        assert_eq!(region.1, "Schmipmammum");
-        assert_eq!(person.0, "Lamuk");
-        assert_eq!(person.1, "Lamuk");
+        assert_eq!(lang.genitive, "lok");
+        assert_eq!(lang.definite, "slok");
+        assert_eq!(word, "snoktekspukskeknak");
+        assert_eq!(place.0, "Stokssossmek");
+        assert_eq!(place.1, "Stokssossmek");
+        assert_eq!(region.0, "Toksmek Smisssessmektok");
+        assert_eq!(region.1, "Toksmek");
+        assert_eq!(person.0, "Pustakstok");
+        assert_eq!(person.1, "Pustakstok");
     }
 
     #[test]
@@ -435,7 +435,7 @@ mod tests {
         println!("Place: {:?}, Region: {:?}, Person: {:?}", place, region, person);
         // These should aways be the same, so we can get the same language for
         // the same seed.
-        assert_eq!(lang.genitive, "doz");
-        assert_eq!(lang.definite, "zulp");
+        assert_eq!(lang.genitive, "kis");
+        assert_eq!(lang.definite, "swg");
     }
 }
