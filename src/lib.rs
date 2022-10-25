@@ -249,18 +249,18 @@ impl Language {
         let orthography = Orthography::new().with_mapping(c_map).with_mapping(v_map);
         let syllable: Vec<char> = SYLLABLESTRUCT.choose(rng).unwrap().chars().collect();
         let min_syllable = if syllable.len() < 3 {
-            rng.gen_range(1u8, 3u8) + 1
+            rng.gen_range(1u8..3u8) + 1
         } else {
-            rng.gen_range(1u8, 3u8)
+            rng.gen_range(1u8..3u8)
         };
-        let max_syllable = rng.gen_range(min_syllable + 1, 7u8);
+        let max_syllable = rng.gen_range(min_syllable + 1..7u8);
         let base = BaseLanguage{phonemes, orthography, syllable, min_syllable, max_syllable};
         // TODO: generate genitive and definite
         let genitive = base.orthography.transform(&base.make_syllable(rng));
         let definite = base.orthography.transform(&base.make_syllable(rng));
-        let place = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
-        let region = (0u8..rng.gen_range(5, 10)).map(|_| base.make_syllable(rng)).collect();
-        let person = (0u8..rng.gen_range(7, 14)).map(|_| base.make_syllable(rng)).collect();
+        let place = (0u8..rng.gen_range(5..10)).map(|_| base.make_syllable(rng)).collect();
+        let region = (0u8..rng.gen_range(5..10)).map(|_| base.make_syllable(rng)).collect();
+        let person = (0u8..rng.gen_range(7..14)).map(|_| base.make_syllable(rng)).collect();
         fn make_title<R: Rng>(rng: &mut R, base: &BaseLanguage) -> String {
             let title = base.orthography.transform(&base.make_syllable(rng));
             if rng.gen::<f32>() < 0.9 {
@@ -270,7 +270,7 @@ impl Language {
             }
         }
         let mut titles = Vec::new();
-        let title_count: usize = rng.gen_range(4u8, 8u8) as usize;
+        let title_count: usize = rng.gen_range(4u8..8u8) as usize;
         while titles.len() < title_count {
             let title = make_title(rng, &base);
             if !titles.contains(&title) {
