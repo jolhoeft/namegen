@@ -2,6 +2,8 @@
 name = "namegen"
 version = "0.3.0"
 authors = ["Jeff Olhoeft <jolhoeft@gmail.com>"]
+description = "A random language and name generator"
+license = "MIT"
 
 [dependencies]
 rand = "0.8"
